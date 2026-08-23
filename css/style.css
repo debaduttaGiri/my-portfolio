@@ -1,0 +1,679 @@
+/* =========================
+   Global
+========================= */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: #0f1115;
+    color: #ffffff;
+}
+
+
+/* =========================
+   NAVBAR
+========================= */
+
+.navbar {
+    position: fixed;
+    top: 4px;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+    background: transparent;
+}
+
+.nav-container {
+    max-width: 1100px;
+    margin: 0 auto;
+
+    padding: 0 24px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+
+/* =========================
+   LOGO
+========================= */
+
+.logo {
+    display: flex;
+    align-items: center;
+}
+
+.logo img {
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+}
+
+
+/* =========================
+   PILL NAVIGATION
+========================= */
+
+.nav-links {
+    display: flex;
+    align-items: center;
+
+    gap: 5px;
+
+    padding: 7px;
+
+    border: 1px solid #292c34;
+
+    border-radius: 17px;
+
+    background: rgba(15, 17, 21, 0.92);
+
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+
+
+/* =========================
+   LINKS
+========================= */
+.nav-links {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+
+    padding: 6px;
+
+    border: 1px solid #292c34;
+    border-radius: 50px;
+
+    background: rgba(15, 17, 21, 0.92);
+
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+
+.nav-links a {
+    position: relative;
+
+    min-width: 91px;
+    padding: 11px 20px;
+
+    text-align: center;
+
+    color: #b8bac2;
+    text-decoration: none;
+
+    font-size: 17px;
+    font-weight: 500;
+
+    border-radius: 7px;
+
+    transition:
+        background 0.25s ease,
+        color 0.25s ease;
+}
+
+.nav-links a.active {
+    color: #000000;
+    background: #f5f5f7;
+    border-radius: 50px;
+}
+
+.nav-links a.active::after {
+    display: none;
+}
+
+
+/* =========================
+   MOBILE BUTTON
+========================= */
+
+.menu-button {
+    display: none;
+
+    background: transparent;
+
+    border: none;
+
+    color: white;
+
+    font-size: 24px;
+
+    cursor: pointer;
+}
+
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 768px) {
+
+    .nav-container {
+        padding: 0 15px;
+    }
+
+    .nav-links {
+        display: none;
+    }
+
+    .menu-button {
+        display: block;
+    }
+
+}
+
+
+
+/* =========================
+   Hero
+========================= */
+
+.hero {
+    min-height: calc(100vh - 80px);
+    display: flex;
+    align-items: center;
+}
+
+.hero-container {
+    max-width: 1100px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 60px 24px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 60px;
+}
+
+
+/* =========================
+   Hero Content
+========================= */
+
+.hero-content {
+    flex: 1;
+}
+
+.hero-greeting {
+    font-size: 20px;
+    color: #8b8f98;
+    margin-bottom: 10px;
+}
+
+.hero-content h1 {
+    font-size: 56px;
+    line-height: 1.1;
+    margin-bottom: 12px;
+}
+
+.hero-content h2 {
+    font-size: 28px;
+    color: #7c8cff;
+    margin-bottom: 20px;
+}
+
+
+/*
+   Fixed role height.
+
+   This prevents the description/buttons
+   from moving when roleText changes.
+*/
+
+#roleText {
+    height: 34px;
+    line-height: 34px;
+    overflow: hidden;
+}
+
+
+.hero-description {
+    max-width: 600px;
+    color: #b8bcc5;
+    font-size: 17px;
+    line-height: 1.7;
+}
+
+
+/* =========================
+   Hero Actions
+========================= */
+
+.hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    margin-top: 30px;
+}
+
+
+/* Terminal-style project link */
+
+.terminal-action {
+    position: relative;
+
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+
+    padding: 12px 0;
+
+    color: #ffffff;
+    text-decoration: none;
+
+    font-family: "Courier New", monospace;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+
+/* > symbol */
+
+.terminal-prompt {
+    color: #635bff;
+
+    transition: transform 0.3s ease;
+}
+
+
+/* Project text */
+
+.terminal-text {
+    position: relative;
+}
+
+
+/* Animated underline */
+
+.terminal-text::after {
+    content: "";
+
+    position: absolute;
+    left: 0;
+    bottom: -7px;
+
+    width: 0;
+    height: 2px;
+
+    background: #635bff;
+
+    transition: width 0.35s ease;
+}
+
+
+/* Arrow */
+
+.terminal-arrow {
+    font-size: 20px;
+    color: #7c8cff;
+
+    transition:
+        transform 0.3s ease,
+        color 0.3s ease;
+}
+
+
+/* Hover */
+
+.terminal-action:hover .terminal-text::after {
+    width: 100%;
+}
+
+.terminal-action:hover .terminal-arrow {
+    transform: translate(5px, -5px);
+    color: #ffffff;
+}
+
+.terminal-action:hover .terminal-prompt {
+    transform: translateX(3px);
+}
+
+
+/* Contact */
+
+.contact-action {
+    color: #9da2ad;
+    text-decoration: none;
+
+    font-size: 15px;
+
+    transition:
+        color 0.25s ease,
+        transform 0.25s ease;
+}
+
+.contact-action:hover {
+    color: #ffffff;
+    transform: translateY(-2px);
+}
+
+
+/* =========================
+   Profile Image - Desktop
+========================= */
+
+.hero-image {
+    flex: 0 0 480px;
+
+    height: 600px;
+
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+}
+
+.image-wrapper {
+    width: 480px;
+    height: 600px;
+}
+
+.image-wrapper img {
+    width: 100%;
+    height: 100%;
+
+    object-fit: contain;
+    object-position: center bottom;
+
+    /*
+       Fade image into page background
+    */
+
+    -webkit-mask-image: linear-gradient(
+        to bottom,
+        black 75%,
+        transparent 100%
+    );
+
+    mask-image: linear-gradient(
+        to bottom,
+        black 75%,
+        transparent 100%
+    );
+}
+
+
+/* =========================
+   Mobile
+========================= */
+@media (max-width: 768px) {
+
+    /* =========================
+       MOBILE NAVBAR
+    ========================= */
+
+    .navbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        z-index: 1000;
+    }
+
+    .nav-container {
+        height: 60px;
+        padding: 8px 20px;
+
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    /* Logo */
+    .logo {
+        display: flex;
+        align-items: center;
+    }
+
+    .logo img {
+        width: 38px;
+        height: 38px;
+    }
+
+    /* Hamburger */
+    .menu-button {
+        display: block;
+
+        background: transparent;
+        border: none;
+
+        color: #ffffff;
+
+        font-size: 25px;
+
+        cursor: pointer;
+
+        z-index: 1002;
+    }
+
+
+    /* =========================
+       MOBILE MENU
+    ========================= */
+
+    .nav-links {
+        display: none;
+
+        position: absolute;
+
+        top: 66px;
+        left: 20px;
+        right: 20px;
+
+        width: auto;
+
+        flex-direction: column;
+
+        gap: 4px;
+
+        padding: 7px;
+
+        background: rgba(15, 17, 21, 0.98);
+
+        border: 1px solid #292c34;
+
+        border-radius: 18px;
+
+        box-shadow:
+            0 15px 40px rgba(0, 0, 0, 0.4);
+
+        z-index: 1001;
+    }
+
+    .nav-links.active {
+        display: flex;
+    }
+
+
+    /* =========================
+       MENU ITEMS
+    ========================= */
+
+    .nav-links a {
+        width: 100%;
+
+        min-width: 0;
+
+        height: 42px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        padding: 0 20px;
+
+        border-radius: 50px;
+
+        color: #b8bac2;
+
+        font-size: 15px;
+
+        white-space: nowrap;
+    }
+
+    .nav-links a:hover {
+        color: #ffffff;
+        background: #181b21;
+    }
+
+
+    /* Active */
+    .nav-links a.active {
+        color: #ffffff;
+
+        background: #242348;
+
+        border-radius: 50px;
+    }
+
+
+    /* Remove dot */
+    .nav-links a.active::after {
+        display: none;
+    }
+
+
+    /* =========================
+       HERO
+    ========================= */
+
+    .hero {
+        min-height: auto;
+
+        overflow: hidden;
+    }
+
+    .hero-container {
+        flex-direction: column;
+
+        padding: 100px 20px 0;
+
+        gap: 20px;
+
+        text-align: center;
+    }
+
+
+    /* Hero content */
+
+    .hero-content {
+        width: 100%;
+    }
+
+    .hero-greeting {
+        font-size: 18px;
+        margin-bottom: 10px;
+    }
+
+    .hero-content h1 {
+        font-size: 44px;
+
+        line-height: 1.05;
+
+        margin-bottom: 18px;
+    }
+
+    .hero-content h2 {
+        font-size: 24px;
+
+        line-height: 1.2;
+
+        color: #c084fc;
+
+        margin-bottom: 22px;
+    }
+
+
+    /* Role */
+
+    #roleText {
+        height: 29px;
+
+        line-height: 29px;
+
+        overflow: hidden;
+
+        white-space: nowrap;
+    }
+
+
+    /* Description */
+
+    .hero-description {
+        max-width: 340px;
+
+        margin: 0 auto;
+
+        font-size: 16px;
+
+        line-height: 1.7;
+    }
+
+
+    /* Actions */
+
+    .hero-actions {
+        justify-content: center;
+
+        gap: 22px;
+
+        margin-top: 26px;
+    }
+
+
+    /* Image */
+
+    .hero-image {
+        flex: none;
+
+        width: 100%;
+
+        height: 360px;
+
+        display: flex;
+
+        justify-content: center;
+
+        align-items: flex-end;
+
+        margin-top: 20px;
+    }
+
+    .image-wrapper {
+        width: 330px;
+        height: auto;
+    }
+
+    .image-wrapper img {
+        width: 100%;
+        height: auto;
+
+        display: block;
+
+        object-fit: contain;
+
+        -webkit-mask-image: radial-gradient(
+            ellipse 68% 72% at 50% 38%,
+            black 45%,
+            rgba(0, 0, 0, 0.9) 58%,
+            transparent 100%
+        );
+
+        mask-image: radial-gradient(
+            ellipse 68% 72% at 50% 38%,
+            black 45%,
+            rgba(0, 0, 0, 0.9) 58%,
+            transparent 100%
+        );
+    }
+}
