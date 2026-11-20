@@ -1,8 +1,11 @@
+
 <nav class="navbar">
     <div class="nav-container">
 
-        <a href="#home" class="logo">
-            <img src="assets/images/logo.png" alt="Debadutta Giri">
+        <a href="#home" class="logo" aria-label="Go to Home">
+            <img src="assets/images/logo.png"
+                 alt="Debadutta Giri"
+                 draggable="false">
         </a>
 
         <div class="nav-links">
@@ -12,8 +15,15 @@
             <a href="#projects">Projects</a>
             <a href="#contact">Contact</a>
         </div>
+        <button class="theme-toggle" id="themeToggle"
+                type="button" aria-label="Switch to light mode"
+                title="Switch to light mode">
+            ☀
+        </button>
 
-        <button class="menu-button" id="menuButton">
+        <button class="menu-button" id="menuButton"
+                aria-label="Toggle navigation"
+                aria-expanded="false">
             ☰
         </button>
 
