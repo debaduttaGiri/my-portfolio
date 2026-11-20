@@ -263,25 +263,44 @@ function setupScrollNavigation() {
 
 
 
+
+
 async function init() {
-
     try {
-
+        // 1. Load navbar
         await loadNavbar();
 
-        // Load Home
+        // 2. Load Home
         await loadComponent(
             "content",
             "sections/home.html"
         );
 
-        // Append About
+        // 3. Load About
         await appendComponent(
             "content",
             "sections/about.html"
         );
 
-        // Initialize after all HTML is loaded
+        // 4. Load Skills
+        await appendComponent(
+            "content",
+            "sections/skills.html"
+        );
+
+        // 5. Load Projects
+        await appendComponent(
+            "content",
+            "sections/projects.html"
+        );
+
+        // 6. Load Contact
+        await appendComponent(
+            "content",
+            "sections/contact.html"
+        );
+
+        // Initialize everything after loading
         initializeReveal();
         initializeNameErase();
         startRoleAnimation();
@@ -289,14 +308,20 @@ async function init() {
 
     }
     catch (error) {
-
         console.error(
             "Portfolio initialization failed:",
             error
         );
-
     }
 }
+
+// Initialize only ONCE
+document.addEventListener("DOMContentLoaded", init);
+
+
+// Initialize application only once
+document.addEventListener("DOMContentLoaded", init);
+
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -565,3 +590,36 @@ async function appendComponent(elementId, filePath) {
 
 
 }
+
+
+// ==========================================
+// CONTACT FORM
+// ==========================================
+
+document.addEventListener("submit", function (e) {
+
+    if (e.target.id !== "contactForm") return;
+
+    e.preventDefault();
+
+    const name = document.getElementById("contactName").value.trim();
+    const email = document.getElementById("contactEmail").value.trim();
+    const subject = document.getElementById("contactSubject").value.trim();
+    const message = document.getElementById("contactMessage").value.trim();
+
+    const recipient = "YOUR_EMAIL@example.com";
+
+    const body = `
+Name: ${name}
+Email: ${email}
+
+Message:
+${message}
+`;
+
+    const mailto = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    window.location.href = mailto;
+
+});
+
