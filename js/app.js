@@ -1,3 +1,17 @@
+// Load HTML without replacing existing sections
+async function appendComponent(elementId, filePath) {
+
+    const response = await fetch(filePath);
+
+    if (!response.ok) {
+        throw new Error(`Failed to load ${filePath}`);
+    }
+
+    const html = await response.text();
+
+    document.getElementById(elementId)
+        .insertAdjacentHTML("beforeend", html);
+}
 async function loadComponent(elementId, filePath) {
     const response = await fetch(filePath);
     const html = await response.text();
@@ -248,32 +262,306 @@ function setupScrollNavigation() {
 }
 
 
-// =========================
-// INITIALIZE
-// =========================
 
 async function init() {
 
-    // 1. Load navbar
-    await loadNavbar();
+    try {
+
+        await loadNavbar();
+
+        // Load Home
+        await loadComponent(
+            "content",
+            "sections/home.html"
+        );
+
+        // Append About
+        await appendComponent(
+            "content",
+            "sections/about.html"
+        );
+
+        // Initialize after all HTML is loaded
+        initializeReveal();
+        initializeNameErase();
+        startRoleAnimation();
+        setupScrollNavigation();
+
+    }
+    catch (error) {
+
+        console.error(
+            "Portfolio initialization failed:",
+            error
+        );
+
+    }
+}
+
+document.addEventListener("DOMContentLoaded", init);
 
 
-    // 2. Load page content
-    await loadComponent(
-        "content",
-        "sections/home.html"
+// Initialize application only once
+document.addEventListener("DOMContentLoaded", init);
+
+
+document.addEventListener("DOMContentLoaded", init);
+
+
+// document.addEventListener("DOMContentLoaded", () => {
+
+//     const observer = new IntersectionObserver(
+//         (entries) => {
+//             entries.forEach(entry => {
+//                 if (entry.isIntersecting) {
+//                     entry.target.classList.add("visible");
+//                     observer.unobserve(entry.target);
+//                 }
+//             });
+//         },
+//         {
+//             threshold: 0.15
+//         }
+//     );
+
+//     document.querySelectorAll(".reveal").forEach(element => {
+//         observer.observe(element);
+//     });
+
+// });
+
+// =========================
+// SCROLL REVEAL
+// =========================
+
+function initializeReveal() {
+
+    const observer = new IntersectionObserver(
+        (entries) => {
+
+            entries.forEach(entry => {
+
+                if (entry.isIntersecting) {
+
+                    entry.target.classList.add("visible");
+
+                    observer.unobserve(entry.target);
+                }
+
+            });
+
+        },
+        {
+            threshold: 0.15
+        }
     );
 
-
-    // 3. Start typing animation
-    startRoleAnimation();
-
-
-    // 4. Setup navigation AFTER
-    //    everything has been loaded
-    setupScrollNavigation();
-
+    document.querySelectorAll(".reveal").forEach(element => {
+        observer.observe(element);
+    });
 }
 
 
-init();
+
+// =================================
+// MAGIC NAME ERASER
+// =================================
+
+function initializeNameErase() {
+
+    const heading = document.getElementById("erasableName");
+
+    if (!heading || heading.dataset.initialized) return;
+
+    heading.dataset.initialized = "true";
+
+    const originalText = heading.textContent.trim();
+
+    // Convert each character into an individual element
+    function renderName() {
+
+        heading.innerHTML = [...originalText].map(char => {
+
+            if (char === " ") {
+                return '<span class="name-space">&nbsp;</span>';
+            }
+
+            return `<span>${char}</span>`;
+
+        }).join("");
+
+    }
+
+    renderName();
+
+    let holdTimer;
+    let isErasing = false;
+    let activePointerId = null;
+    let magicCursor = null;
+
+    // Create glowing cursor
+    function createCursor() {
+
+        magicCursor = document.createElement("div");
+        magicCursor.className = "magic-cursor";
+
+        document.body.appendChild(magicCursor);
+
+    }
+
+    // Create sparkle particles
+    function createParticles(x, y) {
+
+        for (let i = 0; i < 5; i++) {
+
+            const particle = document.createElement("div");
+
+            particle.className = "magic-particle";
+
+            particle.style.left = x + "px";
+            particle.style.top = y + "px";
+
+            particle.style.setProperty(
+                "--particle-x",
+                (Math.random() - .5) * 90 + "px"
+            );
+
+            particle.style.setProperty(
+                "--particle-y",
+                (Math.random() - .5) * 90 + "px"
+            );
+
+            document.body.appendChild(particle);
+
+            particle.addEventListener("animationend", () => {
+                particle.remove();
+            });
+
+        }
+
+    }
+
+    // Start long press
+    heading.addEventListener("pointerdown", e => {
+
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+
+        activePointerId = e.pointerId;
+        isErasing = false;
+
+        holdTimer = setTimeout(() => {
+
+            isErasing = true;
+
+            heading.classList.add("erasing");
+
+            createCursor();
+
+        }, 400);
+
+    });
+
+    // Move magic eraser
+    document.addEventListener("pointermove", e => {
+
+        if (!isErasing || e.pointerId !== activePointerId) return;
+
+        if (magicCursor) {
+
+            magicCursor.style.left = e.clientX + "px";
+            magicCursor.style.top = e.clientY + "px";
+
+        }
+
+        const element = document.elementFromPoint(
+            e.clientX,
+            e.clientY
+        );
+
+        const letter = element?.closest(
+            "#erasableName span:not(.name-space)"
+        );
+
+        if (letter && !letter.classList.contains("erased")) {
+
+            const rect = letter.getBoundingClientRect();
+
+            // Random flying direction
+            letter.style.setProperty(
+                "--fly-x",
+                (Math.random() - .5) * 150 + "px"
+            );
+
+            letter.style.setProperty(
+                "--fly-y",
+                (Math.random() - .5) * 130 - 40 + "px"
+            );
+
+            letter.style.setProperty(
+                "--fly-rotate",
+                (Math.random() - .5) * 100 + "deg"
+            );
+
+            letter.classList.add("erased");
+
+            createParticles(
+                rect.left + rect.width / 2,
+                rect.top + rect.height / 2
+            );
+
+        }
+
+    });
+
+    // Stop erasing
+    function stopErasing(e) {
+
+        if (e.pointerId !== activePointerId) return;
+
+        clearTimeout(holdTimer);
+
+        isErasing = false;
+        activePointerId = null;
+
+        heading.classList.remove("erasing");
+
+        magicCursor?.remove();
+        magicCursor = null;
+
+    }
+
+    document.addEventListener("pointerup", stopErasing);
+    document.addEventListener("pointercancel", stopErasing);
+
+    // Double-click to restore the name
+    heading.addEventListener("dblclick", () => {
+
+        clearTimeout(holdTimer);
+
+        isErasing = false;
+        heading.classList.remove("erasing");
+
+        magicCursor?.remove();
+        magicCursor = null;
+
+        renderName();
+
+    });
+
+// Load additional sections without replacing existing HTML
+async function appendComponent(elementId, filePath) {
+
+    const response = await fetch(filePath);
+
+    if (!response.ok) {
+        throw new Error(`Failed to load ${filePath}`);
+    }
+
+    const html = await response.text();
+
+    document.getElementById(elementId)
+        .insertAdjacentHTML("beforeend", html);
+}
+
+
+}
