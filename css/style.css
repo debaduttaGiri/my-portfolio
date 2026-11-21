@@ -1689,67 +1689,59 @@ section[id] {
     }
     /* Hero */
 
-    .hero {
-        min-height: auto;
-    }
+    
 
-    .hero-container {
-        flex-direction: column;
-        padding: 100px 20px 0;
-        gap: 20px;
-        text-align: center;
-    }
+/* Mobile hero layout */
+.hero {
+    min-height: auto;
+    overflow: hidden;
+}
 
-    .hero-content {
-        width: 100%;
-    }
+.hero-container {
+    flex-direction: column;
+    align-items: center;
+    padding: 100px 20px 30px;
+    gap: 20px;
+    text-align: center;
+}
 
-    .hero-greeting {
-        font-size: 18px;
-    }
+.hero-content {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+}
 
-    .hero-content h1 {
-        font-size: 44px;
-        line-height: 1.05;
-        margin-bottom: 18px;
-    }
+/* Mobile portrait */
+.hero-image {
+    position: relative;
+    z-index: 1;
+    flex: none;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
 
-    .hero-content h2 {
-        height: 29px;
-        line-height: 29px;
-        font-size: 24px;
-        margin-bottom: 22px;
-    }
+    width: 100%;
+    height: auto;
+    min-height: 0;
 
-    .hero-description {
-        max-width: 340px;
-        margin: 0 auto;
-        font-size: 16px;
-        line-height: 1.7;
-    }
+    margin: 10px auto 0;
+}
 
-    .hero-actions {
-        justify-content: center;
-        gap: 22px;
-        margin-top: 26px;
-    }
+.image-wrapper {
+    position: relative;
+    width: min(330px, 100%);
+    height: auto;
+    margin: 0 auto;
+}
 
-    .hero-image {
-        flex: none;
-        width: 100%;
-        height: 360px;
-        margin-top: 20px;
-    }
+.image-wrapper img {
+    display: block;
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    object-position: center top;
+}
 
-    .image-wrapper {
-        width: 330px;
-        height: auto;
-    }
-
-    .image-wrapper img {
-        width: 100%;
-        height: auto;
-    }
 
     /* About, skills and projects */
 
@@ -2350,4 +2342,178 @@ section[id] {
 .project-separator {
     color: var(--text-secondary);
     opacity: 0.5;
+}
+
+/*vanish */
+.image-wrapper {
+    position: relative;
+    width: 540px;
+    height: 650px;
+    cursor: pointer;
+}
+
+#thanosImage {
+    transition: opacity 0.2s ease;
+}
+
+#thanosCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    display: none;
+}
+/* Thanos disintegration effect */
+.image-wrapper {
+    position: relative;
+    overflow: visible;
+    cursor: pointer;
+}
+
+#thanosImage {
+    transition: opacity 0.15s ease;
+}
+
+#thanosCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    pointer-events: none;
+    z-index: 2;
+}
+.image-wrapper {
+    position: relative;
+    overflow: visible;
+    cursor: pointer;
+}
+
+#thanosImage {
+    display: block;
+    position: relative;
+    z-index: 1;
+    transition: opacity 0.2s ease;
+}
+
+#thanosCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    pointer-events: none;
+    z-index: 2;
+}
+.image-wrapper {
+    position: relative;
+    cursor: pointer;
+}
+
+#thanosImage {
+    position: relative;
+    z-index: 1;
+    pointer-events: auto !important;
+    transition: opacity 0.2s ease;
+}
+
+#thanosCanvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    pointer-events: none !important;
+    z-index: 2;
+}
+.image-wrapper,
+.hero-image {
+    overflow: visible !important;
+}
+
+#thanosCanvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: none;
+    pointer-events: none;
+    z-index: 2;
+    max-width: none;
+}
+
+/* Mobile hero spacing and typography */
+@media (max-width: 768px) {
+
+    .hero-container {
+        gap: 4px;
+        padding-top: 90px;
+        padding-bottom: 15px;
+    }
+
+    .hero-content h1 {
+        font-size: clamp(30px, 8.5vw, 36px);
+        line-height: 1.1;
+        letter-spacing: -1.2px;
+        white-space: nowrap;
+        margin-bottom: 14px;
+    }
+
+    .hero-content h2 {
+        margin-bottom: 15px;
+    }
+
+    .hero-description {
+        line-height: 1.6;
+    }
+
+    .hero-actions {
+        margin-top: 18px;
+        gap: 22px;
+    }
+
+    .hero-image {
+        margin-top: -25px;
+    }
+
+    .image-wrapper {
+        width: min(340px, 100%);
+    }
+}
+
+@media (max-width: 360px) {
+    .hero-content h1 {
+        font-size: 29px;
+        letter-spacing: -1px;
+    }
+}
+
+/* Reduce empty space between mobile hero and About section */
+@media (max-width: 768px) {
+
+    #home {
+        min-height: auto !important;
+        padding-bottom: 0 !important;
+    }
+
+    .hero-container {
+        padding-bottom: 0 !important;
+        gap: 0 !important;
+    }
+
+    .hero-image {
+        margin-bottom: 0 !important;
+    }
+
+    .about-section {
+        padding-top: 10px !important;
+    }
+}
+@media (max-width: 768px) {
+    .hero-content h1 {
+        font-size: clamp(41px, 9vw, 40px);
+        line-height: 1.1;
+        letter-spacing: -1px;
+        white-space: nowrap;
+    }
 }
