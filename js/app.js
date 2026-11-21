@@ -510,33 +510,90 @@ function initializeTheme() {
 
 
 
+
+
 function initializeThanosEffect() {
     const img = document.getElementById("thanosImage");
     const wrapper = document.querySelector(".image-wrapper");
 
-    if (!img || !wrapper) return;
+    if (!img || !wrapper || img.dataset.thanosInitialized === "true") return;
 
-    if (img.dataset.thanosInitialized === "true") return;
     img.dataset.thanosInitialized = "true";
+
+    // ================= CONFIGURATION =================
+
+    const DURATION = 12000;
+    const PARTICLE_LIFETIME = 6500;
+
+    // One particle per 5x5 source-pixel area.
+    const PARTICLE_STEP = 5;
+
+    // Particle movement.
+    const UPWARD_MIN = 75;
+    const UPWARD_MAX = 220;
+
+    const RIGHT_MIN = 15;
+    const RIGHT_MAX = 155;
+
+    // Space for particles above and to the right.
+    const TOP_SPACE = 300;
+    const RIGHT_SPACE = 500;
+
+    const RELEASE_VARIATION = 0.12;
+
+    // ==================================================
 
     const canvas = document.createElement("canvas");
     canvas.id = "thanosCanvas";
+
+    Object.assign(canvas.style, {
+        position: "absolute",
+        pointerEvents: "none",
+        display: "none",
+        zIndex: "5"
+    });
+
     wrapper.appendChild(canvas);
 
-    const ctx = canvas.getContext("2d");
+    const gl = canvas.getContext("webgl2", {
+        alpha: true,
+        antialias: false,
+        premultipliedAlpha: false
+    });
 
-    const DURATION = 12000;
-    const PARTICLE_LIFETIME = 9000;
-    const GAP = 5;
-    const EXTRA_WIND_SPACE = 1100;
+    if (!gl) {
+        console.error("WebGL2 is not supported.");
+        canvas.remove();
+        return;
+    }
 
-    // Soft diagonal transition.
-    const FEATHER = 0.045;
+    // Preserve original mask styles.
+    const originalMask = img.style.maskImage;
+    const originalWebkitMask = img.style.webkitMaskImage;
+    const originalMaskComposite = img.style.maskComposite;
+    const originalWebkitMaskComposite =
+        img.style.webkitMaskComposite;
 
-    // Preserve the original bottom fade.
-    const BOTTOM_FADE_START = 0.65;
+    const computed = getComputedStyle(img);
 
-    let particles = [];
+    const baseMask = computed.maskImage;
+    const baseWebkitMask = computed.webkitMaskImage;
+
+    const baseMaskComposite = computed.maskComposite;
+    const baseWebkitMaskComposite =
+        computed.webkitMaskComposite;
+
+    const baseMaskSize = computed.maskSize;
+    const baseWebkitMaskSize = computed.webkitMaskSize;
+
+    const baseMaskRepeat = computed.maskRepeat;
+    const baseWebkitMaskRepeat = computed.webkitMaskRepeat;
+
+    let program = null;
+    let texture = null;
+    let buffer = null;
+
+    let particleCount = 0;
     let animationFrame = null;
     let startTime = 0;
     let state = "ready";
@@ -544,110 +601,361 @@ function initializeThanosEffect() {
     let imageWidth = 0;
     let imageHeight = 0;
 
-    // Preserve original inline mask styles.
-    const originalInlineMask = img.style.maskImage;
-    const originalInlineWebkitMask = img.style.webkitMaskImage;
+    let imageCssWidth = 0;
+    let imageCssHeight = 0;
 
-    const originalInlineMaskComposite = img.style.maskComposite;
-    const originalInlineWebkitMaskComposite =
-        img.style.webkitMaskComposite;
+    let dpr = 1;
 
-    const originalInlineMaskSize = img.style.maskSize;
-    const originalInlineWebkitMaskSize = img.style.webkitMaskSize;
+    const uniforms = {};
 
-    const originalInlineMaskRepeat = img.style.maskRepeat;
-    const originalInlineWebkitMaskRepeat =
-        img.style.webkitMaskRepeat;
+    // ================= VERTEX SHADER =================
 
-    // Capture original CSS masks.
-    const originalComputedStyle = getComputedStyle(img);
+    const vertexShaderSource = `#version 300 es
+        precision highp float;
 
-    const originalComputedMask =
-        originalComputedStyle.maskImage !== "none"
-            ? originalComputedStyle.maskImage
-            : "linear-gradient(black, black)";
+        in vec2 a_uv;
 
-    const originalComputedWebkitMask =
-        originalComputedStyle.webkitMaskImage !== "none"
-            ? originalComputedStyle.webkitMaskImage
-            : "linear-gradient(black, black)";
+        uniform float u_elapsed;
+        uniform float u_duration;
+        uniform float u_lifetime;
 
-    const originalComputedMaskSize =
-        originalComputedStyle.maskSize;
+        uniform float u_imageWidth;
+        uniform float u_imageHeight;
 
-    const originalComputedWebkitMaskSize =
-        originalComputedStyle.webkitMaskSize;
+        uniform float u_canvasWidth;
+        uniform float u_canvasHeight;
 
-    const originalComputedMaskRepeat =
-        originalComputedStyle.maskRepeat;
+        uniform float u_topSpace;
+        uniform float u_pixelSize;
 
-    const originalComputedWebkitMaskRepeat =
-        originalComputedStyle.webkitMaskRepeat;
+        uniform float u_upwardMin;
+        uniform float u_upwardMax;
 
-    function splitCssLayers(value) {
-        const layers = [];
-        let depth = 0;
-        let current = "";
-        let quote = null;
+        uniform float u_rightMin;
+        uniform float u_rightMax;
 
-        for (let i = 0; i < value.length; i++) {
-            const char = value[i];
+        uniform float u_releaseVariation;
 
-            if (quote) {
-                current += char;
+        out vec2 v_uv;
+        out float v_alpha;
 
-                if (char === quote && value[i - 1] !== "\\") {
-                    quote = null;
-                }
+        float randomValue(vec2 p) {
+            return fract(
+                sin(dot(p, vec2(127.1, 311.7))) *
+                43758.5453123
+            );
+        }
 
-                continue;
+        void main() {
+            vec2 pixelPosition = floor(
+                a_uv * vec2(u_imageWidth, u_imageHeight)
+            );
+
+            float random1 = randomValue(pixelPosition);
+            float random2 = randomValue(pixelPosition + 17.31);
+            float random3 = randomValue(pixelPosition + 43.17);
+            float random4 = randomValue(pixelPosition + 91.73);
+
+            // Top-right to bottom-left release sequence.
+            float releaseProgress =
+                0.5 * (1.0 - a_uv.x) +
+                0.5 * a_uv.y;
+
+            float releaseJitter =
+                (random1 - 0.5) * u_releaseVariation;
+
+            float releaseTime =
+                clamp(
+                    releaseProgress + releaseJitter,
+                    0.0,
+                    1.0
+                ) * u_duration;
+
+            float age = u_elapsed - releaseTime;
+
+            v_uv = a_uv;
+
+            if (age < 0.0 || age > u_lifetime) {
+                gl_Position = vec4(2.0, 2.0, 0.0, 1.0);
+                gl_PointSize = 0.0;
+                v_alpha = 0.0;
+                return;
             }
 
-            if (char === '"' || char === "'") {
-                quote = char;
-                current += char;
-                continue;
-            }
+            // Original source location.
+            float originalX = a_uv.x * u_imageWidth;
+            float originalY = a_uv.y * u_imageHeight;
 
-            if (char === "(") depth++;
-            if (char === ")") depth--;
+            // Individual upward and rightward speeds.
+            float upwardSpeed = mix(
+                u_upwardMin,
+                u_upwardMax,
+                random2
+            );
 
-            if (char === "," && depth === 0) {
-                layers.push(current.trim());
-                current = "";
-            } else {
-                current += char;
+            float rightSpeed = mix(
+                u_rightMin,
+                u_rightMax,
+                random3
+            );
+
+            float upwardAcceleration =
+                12.0 + random4 * 28.0;
+
+            float horizontalAcceleration =
+                4.0 + random1 * 20.0;
+
+            float upward =
+                upwardSpeed * age +
+                0.5 * upwardAcceleration * age * age;
+
+            float horizontal =
+                rightSpeed * age +
+                0.5 * horizontalAcceleration * age * age;
+
+            // Independent airflow.
+            float phase = random1 * 6.28318530718;
+
+            float turbulenceX =
+                sin(age * (2.0 + random2 * 2.0) + phase)
+                * (5.0 + random3 * 18.0) * age;
+
+            float turbulenceY =
+                cos(age * (1.5 + random4 * 2.0) + phase)
+                * (3.0 + random1 * 12.0) * age;
+
+            float spreadX =
+                (random2 - 0.5) * 22.0 * age;
+
+            float spreadY =
+                (random3 - 0.5) * 12.0 * age;
+
+            float x =
+                originalX +
+                horizontal +
+                turbulenceX +
+                spreadX;
+
+            float y =
+                u_topSpace +
+                originalY -
+                upward +
+                turbulenceY +
+                spreadY;
+
+            float ndcX =
+                (x / u_canvasWidth) * 2.0 - 1.0;
+
+            float ndcY =
+                1.0 - (y / u_canvasHeight) * 2.0;
+
+            gl_Position = vec4(ndcX, ndcY, 0.0, 1.0);
+
+            gl_PointSize = u_pixelSize;
+
+            v_alpha = 1.0 - smoothstep(
+                u_lifetime * 0.35,
+                u_lifetime,
+                age
+            );
+        }
+    `;
+
+    // ================= FRAGMENT SHADER =================
+
+    const fragmentShaderSource = `#version 300 es
+        precision highp float;
+
+        uniform sampler2D u_image;
+
+        in vec2 v_uv;
+        in float v_alpha;
+
+        out vec4 outColor;
+
+        void main() {
+            // Circular particle with soft edges.
+            vec2 point = gl_PointCoord - vec2(0.5);
+
+            float distanceFromCenter = length(point);
+
+            float circleAlpha =
+                1.0 - smoothstep(0.28, 0.5, distanceFromCenter);
+
+            if (circleAlpha <= 0.01) discard;
+
+            // Read original pixel colour.
+            vec4 color = texture(
+                u_image,
+                vec2(v_uv.x, 1.0 - v_uv.y)
+            );
+
+            // Ignore transparent pixels.
+            if (color.a < 0.01) discard;
+
+            outColor = vec4(
+                color.rgb,
+                color.a * v_alpha * circleAlpha
+            );
+        }
+    `;
+
+    // ================= SHADER CREATION =================
+
+    function createShader(type, source) {
+        const shader = gl.createShader(type);
+
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(shader));
+            gl.deleteShader(shader);
+            return null;
+        }
+
+        return shader;
+    }
+
+    function createProgram() {
+        const vertexShader = createShader(
+            gl.VERTEX_SHADER,
+            vertexShaderSource
+        );
+
+        const fragmentShader = createShader(
+            gl.FRAGMENT_SHADER,
+            fragmentShaderSource
+        );
+
+        if (!vertexShader || !fragmentShader) return null;
+
+        const result = gl.createProgram();
+
+        gl.attachShader(result, vertexShader);
+        gl.attachShader(result, fragmentShader);
+
+        gl.linkProgram(result);
+
+        if (!gl.getProgramParameter(result, gl.LINK_STATUS)) {
+            console.error(gl.getProgramInfoLog(result));
+            return null;
+        }
+
+        gl.deleteShader(vertexShader);
+        gl.deleteShader(fragmentShader);
+
+        return result;
+    }
+
+    function getUniform(name) {
+        return gl.getUniformLocation(program, name);
+    }
+
+    // ================= TEXTURE =================
+
+    function createTexture() {
+        texture = gl.createTexture();
+
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+        gl.texParameteri(
+            gl.TEXTURE_2D,
+            gl.TEXTURE_MIN_FILTER,
+            gl.NEAREST
+        );
+
+        gl.texParameteri(
+            gl.TEXTURE_2D,
+            gl.TEXTURE_MAG_FILTER,
+            gl.NEAREST
+        );
+
+        gl.texParameteri(
+            gl.TEXTURE_2D,
+            gl.TEXTURE_WRAP_S,
+            gl.CLAMP_TO_EDGE
+        );
+
+        gl.texParameteri(
+            gl.TEXTURE_2D,
+            gl.TEXTURE_WRAP_T,
+            gl.CLAMP_TO_EDGE
+        );
+
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            img
+        );
+    }
+
+    // ================= PIXEL SAMPLING =================
+
+    function createPixelVertices() {
+        const columns = Math.ceil(imageWidth / PARTICLE_STEP);
+        const rows = Math.ceil(imageHeight / PARTICLE_STEP);
+
+        const vertices = new Float32Array(
+            columns * rows * 2
+        );
+
+        let index = 0;
+
+        for (let y = 0; y < imageHeight; y += PARTICLE_STEP) {
+            for (let x = 0; x < imageWidth; x += PARTICLE_STEP) {
+                const sampleX = Math.min(
+                    x + PARTICLE_STEP / 2,
+                    imageWidth - 0.5
+                );
+
+                const sampleY = Math.min(
+                    y + PARTICLE_STEP / 2,
+                    imageHeight - 0.5
+                );
+
+                vertices[index++] = sampleX / imageWidth;
+                vertices[index++] = sampleY / imageHeight;
             }
         }
 
-        if (current.trim()) {
-            layers.push(current.trim());
-        }
+        particleCount = index / 2;
 
-        return layers;
+        buffer = gl.createBuffer();
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+
+        gl.bufferData(
+            gl.ARRAY_BUFFER,
+            vertices,
+            gl.STATIC_DRAW
+        );
+
+        const location = gl.getAttribLocation(
+            program,
+            "a_uv"
+        );
+
+        gl.enableVertexAttribArray(location);
+
+        gl.vertexAttribPointer(
+            location,
+            2,
+            gl.FLOAT,
+            false,
+            0,
+            0
+        );
     }
 
-    const maskLayers = splitCssLayers(originalComputedMask);
-    const webkitMaskLayers =
-        splitCssLayers(originalComputedWebkitMask);
+    // ================= CANVAS SETUP =================
 
-    function repeatOperator(operator, count) {
-        return Array(Math.max(1, count))
-            .fill(operator)
-            .join(", ");
-    }
-
-    const maskComposite = repeatOperator(
-        "intersect",
-        maskLayers.length
-    );
-
-    const webkitMaskComposite = repeatOperator(
-        "source-in",
-        webkitMaskLayers.length
-    );
-
-    function setupCanvas() {
+    function setup() {
         const rect = img.getBoundingClientRect();
         const wrapperRect = wrapper.getBoundingClientRect();
 
@@ -656,348 +964,266 @@ function initializeThanosEffect() {
 
         if (!imageWidth || !imageHeight || !rect.width) return;
 
-        const scale = imageWidth / rect.width;
-        const extraWidth = EXTRA_WIND_SPACE * scale;
+        imageCssWidth = rect.width;
+        imageCssHeight = rect.height;
 
-        canvas.width = Math.ceil(imageWidth + extraWidth);
-        canvas.height = imageHeight;
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
 
-        canvas.style.position = "absolute";
-        canvas.style.display = "none";
-        canvas.style.pointerEvents = "none";
-        canvas.style.zIndex = "2";
+        const canvasCssWidth = rect.width + RIGHT_SPACE;
+        const canvasCssHeight = rect.height + TOP_SPACE;
 
-        canvas.style.width =
-            `calc(100% + ${EXTRA_WIND_SPACE}px)`;
+        canvas.width = Math.ceil(canvasCssWidth * dpr);
+        canvas.height = Math.ceil(canvasCssHeight * dpr);
 
-        canvas.style.height = "100%";
+        canvas.style.width = `${canvasCssWidth}px`;
+        canvas.style.height = `${canvasCssHeight}px`;
 
         canvas.style.left =
             `${rect.left - wrapperRect.left}px`;
 
         canvas.style.top =
-            `${rect.top - wrapperRect.top}px`;
+            `${rect.top - wrapperRect.top - TOP_SPACE}px`;
+
+        gl.viewport(0, 0, canvas.width, canvas.height);
+
+        if (!program) {
+            program = createProgram();
+            if (!program) return;
+
+            gl.useProgram(program);
+
+            const names = [
+                "u_elapsed",
+                "u_duration",
+                "u_lifetime",
+                "u_imageWidth",
+                "u_imageHeight",
+                "u_canvasWidth",
+                "u_canvasHeight",
+                "u_topSpace",
+                "u_pixelSize",
+                "u_upwardMin",
+                "u_upwardMax",
+                "u_rightMin",
+                "u_rightMax",
+                "u_releaseVariation",
+                "u_image"
+            ];
+
+            for (const name of names) {
+                uniforms[name] = getUniform(name);
+            }
+
+            createTexture();
+            createPixelVertices();
+        }
+
+        gl.useProgram(program);
+
+        gl.uniform1f(
+            uniforms.u_imageWidth,
+            imageCssWidth * dpr
+        );
+
+        gl.uniform1f(
+            uniforms.u_imageHeight,
+            imageCssHeight * dpr
+        );
+
+        gl.uniform1f(
+            uniforms.u_canvasWidth,
+            canvas.width
+        );
+
+        gl.uniform1f(
+            uniforms.u_canvasHeight,
+            canvas.height
+        );
+
+        gl.uniform1f(
+            uniforms.u_topSpace,
+            TOP_SPACE * dpr
+        );
+
+        gl.uniform1f(
+            uniforms.u_pixelSize,
+            Math.max(2, PARTICLE_STEP * dpr * 0.8)
+        );
+
+        gl.uniform1f(
+            uniforms.u_duration,
+            DURATION / 1000
+        );
+
+        gl.uniform1f(
+            uniforms.u_lifetime,
+            PARTICLE_LIFETIME / 1000
+        );
+
+        gl.uniform1f(
+            uniforms.u_upwardMin,
+            UPWARD_MIN * dpr
+        );
+
+        gl.uniform1f(
+            uniforms.u_upwardMax,
+            UPWARD_MAX * dpr
+        );
+
+        gl.uniform1f(
+            uniforms.u_rightMin,
+            RIGHT_MIN * dpr
+        );
+
+        gl.uniform1f(
+            uniforms.u_rightMax,
+            RIGHT_MAX * dpr
+        );
+
+        gl.uniform1f(
+            uniforms.u_releaseVariation,
+            RELEASE_VARIATION
+        );
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+
+        gl.uniform1i(uniforms.u_image, 0);
     }
 
-    /*
-     * Soft diagonal + bottom fade.
-     *
-     * Top-right = 0
-     * Bottom-left = 1
-     *
-     * The animated SVG now contains an additional
-     * bottom fade from 65% to 100%.
-     */
-    function applySoftMask(progress) {
+    // ================= IMAGE MASK =================
 
-        if (progress <= 0) {
-            restoreOriginalMask();
-            return;
-        }
+    function restoreMask() {
+        img.style.maskImage = originalMask;
+        img.style.webkitMaskImage = originalWebkitMask;
 
-        const transparentMask =
-            "linear-gradient(rgba(0,0,0,0), rgba(0,0,0,0))";
+        img.style.maskComposite = originalMaskComposite;
+        img.style.webkitMaskComposite =
+            originalWebkitMaskComposite;
+    }
 
-        if (progress >= 1) {
-            img.style.maskImage =
-                `${transparentMask}, ${originalComputedMask}`;
-
-            img.style.webkitMaskImage =
-                `${transparentMask}, ${originalComputedWebkitMask}`;
-
-            img.style.maskComposite = maskComposite;
-            img.style.webkitMaskComposite = webkitMaskComposite;
-
-            img.style.maskSize =
-                `100% 100%, ${originalComputedMaskSize}`;
-
-            img.style.webkitMaskSize =
-                `100% 100%, ${originalComputedWebkitMaskSize}`;
-
-            img.style.maskRepeat =
-                `no-repeat, ${originalComputedMaskRepeat}`;
-
-            img.style.webkitMaskRepeat =
-                `no-repeat, ${originalComputedWebkitMaskRepeat}`;
-
-            return;
-        }
-
-        const start = Math.max(0, progress - FEATHER);
-        const end = Math.min(1, progress + FEATHER);
+    function applyDissolveMask(progress) {
+        const start = Math.max(0, progress - 0.045);
+        const end = Math.min(1, progress + 0.045);
 
         const svg = `
             <svg xmlns="http://www.w3.org/2000/svg"
                  viewBox="0 0 1000 1000">
 
-                <defs>
+                <linearGradient
+                    id="dissolve"
+                    x1="1000"
+                    y1="0"
+                    x2="0"
+                    y2="1000"
+                    gradientUnits="userSpaceOnUse">
 
-                    <!-- Diagonal dissolve gradient -->
-                    <linearGradient
-                        id="softDissolve"
-                        x1="1000"
-                        y1="0"
-                        x2="0"
-                        y2="1000"
-                        gradientUnits="userSpaceOnUse">
+                    <stop
+                        offset="${start * 100}%"
+                        stop-color="white"
+                        stop-opacity="0"/>
 
-                        <stop
-                            offset="${start * 100}%"
-                            stop-color="white"
-                            stop-opacity="0"/>
-
-                        <stop
-                            offset="${end * 100}%"
-                            stop-color="white"
-                            stop-opacity="1"/>
-
-                    </linearGradient>
-
-                    <!-- Additional bottom fade -->
-                    <linearGradient
-                        id="bottomFade"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1000"
-                        gradientUnits="userSpaceOnUse">
-
-                        <stop
-                            offset="0%"
-                            stop-color="white"
-                            stop-opacity="1"/>
-
-                        <stop
-                            offset="${BOTTOM_FADE_START * 100}%"
-                            stop-color="white"
-                            stop-opacity="1"/>
-
-                        <stop
-                            offset="100%"
-                            stop-color="white"
-                            stop-opacity="0"/>
-
-                    </linearGradient>
-
-                    <!-- Combine both masks -->
-                    <mask id="bottomMask">
-                        <rect
-                            width="1000"
-                            height="1000"
-                            fill="url(#bottomFade)"/>
-                    </mask>
-
-                </defs>
+                    <stop
+                        offset="${end * 100}%"
+                        stop-color="white"
+                        stop-opacity="1"/>
+                </linearGradient>
 
                 <rect
                     width="1000"
                     height="1000"
-                    fill="url(#softDissolve)"
-                    mask="url(#bottomMask)"/>
-
+                    fill="url(#dissolve)"/>
             </svg>
         `;
 
         const animatedMask =
             `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 
-        // Animated mask + original CSS masks.
         img.style.maskImage =
-            `${animatedMask}, ${originalComputedMask}`;
+            `${animatedMask}, ${baseMask}`;
 
         img.style.webkitMaskImage =
-            `${animatedMask}, ${originalComputedWebkitMask}`;
+            `${animatedMask}, ${baseWebkitMask}`;
 
-        img.style.maskComposite = maskComposite;
-        img.style.webkitMaskComposite = webkitMaskComposite;
+        img.style.maskComposite =
+            baseMaskComposite || "intersect";
+
+        img.style.webkitMaskComposite =
+            baseWebkitMaskComposite || "source-in";
 
         img.style.maskSize =
-            `100% 100%, ${originalComputedMaskSize}`;
+            `100% 100%, ${baseMaskSize}`;
 
         img.style.webkitMaskSize =
-            `100% 100%, ${originalComputedWebkitMaskSize}`;
+            `100% 100%, ${baseWebkitMaskSize}`;
 
         img.style.maskRepeat =
-            `no-repeat, ${originalComputedMaskRepeat}`;
+            `no-repeat, ${baseMaskRepeat}`;
 
         img.style.webkitMaskRepeat =
-            `no-repeat, ${originalComputedWebkitMaskRepeat}`;
+            `no-repeat, ${baseWebkitMaskRepeat}`;
     }
 
-    function restoreOriginalMask() {
-        img.style.maskImage = originalInlineMask;
-        img.style.webkitMaskImage = originalInlineWebkitMask;
+    // ================= ANIMATION =================
 
-        img.style.maskComposite = originalInlineMaskComposite;
-        img.style.webkitMaskComposite =
-            originalInlineWebkitMaskComposite;
-
-        img.style.maskSize = originalInlineMaskSize;
-        img.style.webkitMaskSize = originalInlineWebkitMaskSize;
-
-        img.style.maskRepeat = originalInlineMaskRepeat;
-        img.style.webkitMaskRepeat = originalInlineWebkitMaskRepeat;
-    }
-
-    function createParticles() {
-        const tempCanvas = document.createElement("canvas");
-
-        tempCanvas.width = imageWidth;
-        tempCanvas.height = imageHeight;
-
-        const tempCtx = tempCanvas.getContext("2d", {
-            willReadFrequently: true
-        });
-
-        tempCtx.drawImage(
-            img,
-            0,
-            0,
-            imageWidth,
-            imageHeight
-        );
-
-        const imageData = tempCtx.getImageData(
-            0,
-            0,
-            imageWidth,
-            imageHeight
-        ).data;
-
-        particles = [];
-
-        for (let y = 0; y < imageHeight; y += GAP) {
-            for (let x = 0; x < imageWidth; x += GAP) {
-
-                const index = (y * imageWidth + x) * 4;
-                const alpha = imageData[index + 3];
-
-                if (alpha < 80) continue;
-
-                const red = imageData[index];
-                const green = imageData[index + 1];
-                const blue = imageData[index + 2];
-
-                // Top-right = 0, bottom-left = 1.
-                const progress =
-                    0.5 * (1 - x / imageWidth) +
-                    0.5 * (y / imageHeight);
-
-                particles.push({
-                    x,
-                    y,
-                    originX: x,
-                    originY: y,
-                    progress,
-
-                    color: `rgba(${red}, ${green}, ${blue}, ${alpha / 255})`,
-
-                    size: 1.2 + Math.random() * 2.2,
-
-                    speed: 0.7 + Math.random() * 0.8,
-                    phase: Math.random() * Math.PI * 2,
-                    turbulence: 5 + Math.random() * 15,
-
-                    rotation: Math.random() * Math.PI,
-                    rotationSpeed: (Math.random() - 0.5) * 0.04
-                });
-            }
-        }
-    }
-
-    function animate(timestamp) {
+    function render(timestamp) {
         if (!startTime) startTime = timestamp;
 
-        const elapsed = timestamp - startTime;
-        const progress = Math.min(elapsed / DURATION, 1);
+        const elapsed = (timestamp - startTime) / 1000;
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const progress = Math.min(
+            elapsed / (DURATION / 1000),
+            1
+        );
 
-        applySoftMask(progress);
+        applyDissolveMask(progress);
 
-        for (const p of particles) {
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
 
-            const releaseTime = p.progress * DURATION;
-            const particleAge = (elapsed - releaseTime) / 1000;
+        gl.useProgram(program);
 
-            if (
-                particleAge < 0 ||
-                particleAge > PARTICLE_LIFETIME / 1000
-            ) {
-                continue;
-            }
+        gl.uniform1f(
+            uniforms.u_elapsed,
+            elapsed
+        );
 
-            const windX =
-                (180 + p.speed * 100) * particleAge +
-                55 * particleAge * particleAge;
+        gl.enable(gl.BLEND);
 
-            const windY =
-                -(25 + p.speed * 35) * particleAge -
-                5 * particleAge * particleAge;
+        gl.blendFunc(
+            gl.SRC_ALPHA,
+            gl.ONE_MINUS_SRC_ALPHA
+        );
 
-            const flowX =
-                (Math.sin(elapsed * 0.00065 + p.phase) -
-                    Math.sin(p.phase)) * p.turbulence * 2;
+        gl.drawArrays(
+            gl.POINTS,
+            0,
+            particleCount
+        );
 
-            const flowY =
-                (Math.sin(elapsed * 0.0005 + p.phase * 1.3) -
-                    Math.sin(p.phase * 1.3)) * p.turbulence * 1.5;
+        const animationEnd =
+            DURATION / 1000 +
+            PARTICLE_LIFETIME / 1000;
 
-            const driftX =
-                Math.sin(elapsed * 0.0003 + p.phase) *
-                particleAge * 8;
-
-            const driftY =
-                Math.cos(elapsed * 0.0004 + p.phase) *
-                particleAge * 7;
-
-            p.x = p.originX + windX + flowX + driftX;
-            p.y = p.originY + windY + flowY + driftY;
-
-            p.rotation += p.rotationSpeed;
-
-            const fade = Math.max(
-                0,
-                1 - particleAge / (PARTICLE_LIFETIME / 1000)
-            );
-
-            const size = p.size * fade;
-
-            if (size <= 0.1) continue;
-
-            ctx.save();
-
-            ctx.globalAlpha = fade;
-            ctx.translate(p.x, p.y);
-            ctx.rotate(p.rotation);
-
-            ctx.fillStyle = p.color;
-            ctx.shadowBlur = 6;
-            ctx.shadowColor = p.color;
-
-            ctx.fillRect(
-                -size / 2,
-                -size / 2,
-                size,
-                size
-            );
-
-            ctx.restore();
-        }
-
-        if (progress < 1) {
-            animationFrame = requestAnimationFrame(animate);
+        if (elapsed < animationEnd) {
+            animationFrame = requestAnimationFrame(render);
         } else {
-            applySoftMask(1);
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            gl.clear(gl.COLOR_BUFFER_BIT);
 
             canvas.style.display = "none";
+
+            img.style.maskImage =
+                "linear-gradient(transparent, transparent)";
+
+            img.style.webkitMaskImage =
+                "linear-gradient(transparent, transparent)";
 
             state = "gone";
             animationFrame = null;
         }
     }
+
+    // ================= START / RESTORE =================
 
     function startDisintegration() {
         if (state === "disintegrating") return;
@@ -1009,22 +1235,17 @@ function initializeThanosEffect() {
 
         if (!img.complete || !img.naturalWidth) return;
 
+        setup();
+
+        if (!program) return;
+
         state = "disintegrating";
-
-        setupCanvas();
-
-        if (!canvas.width || !canvas.height) {
-            state = "ready";
-            return;
-        }
-
-        createParticles();
 
         canvas.style.display = "block";
 
         startTime = 0;
 
-        animationFrame = requestAnimationFrame(animate);
+        animationFrame = requestAnimationFrame(render);
     }
 
     function restoreImage() {
@@ -1033,31 +1254,36 @@ function initializeThanosEffect() {
             animationFrame = null;
         }
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        particles = [];
-
-        restoreOriginalMask();
+        gl.clear(gl.COLOR_BUFFER_BIT);
 
         canvas.style.display = "none";
+
+        restoreMask();
 
         state = "ready";
         startTime = 0;
     }
 
     img.addEventListener("click", startDisintegration);
-
     img.style.cursor = "pointer";
 
     if (img.complete && img.naturalWidth) {
-        setupCanvas();
+        setup();
     } else {
-        img.addEventListener("load", setupCanvas, { once: true });
+        img.addEventListener("load", setup, { once: true });
     }
+
+    window.addEventListener("resize", () => {
+        if (state === "ready") {
+            setup();
+        }
+    });
 }
 
-document.addEventListener("DOMContentLoaded", initializeThanosEffect);
-
+document.addEventListener(
+    "DOMContentLoaded",
+    initializeThanosEffect
+);
 
 
 
