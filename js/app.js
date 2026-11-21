@@ -149,11 +149,11 @@ function startRoleAnimation() {
     if (!roleText) return;
 
     const roles = [
-        "Full Stack .NET Developer",
-        "Angular Developer",
-        "SQL Developer",
-        "AWS Developer"
-    ];
+    "Full Stack .NET Developer",
+    "Angular Developer",
+    "SQL Server Developer",
+    "AWS Cloud Developer"
+];
 
     let roleIndex = 0;
     let charIndex = 0;
@@ -324,6 +324,7 @@ function initializeNameErase() {
 
         holdTimer = setTimeout(() => {
             isErasing = true;
+            suppressNextClick = true;
             heading.classList.add("erasing");
             createCursor();
         }, 400);
@@ -381,14 +382,25 @@ function initializeNameErase() {
     document.addEventListener("pointerup", stopErasing);
     document.addEventListener("pointercancel", stopErasing);
 
-    // Double-click to restore the name
-    heading.addEventListener("dblclick", () => {
-        stopErasing({
-            pointerId: activePointerId
-        });
+    // Single-click to restore the name
+let suppressNextClick = false;
 
-        renderName();
+heading.addEventListener("pointerdown", () => {
+    suppressNextClick = false;
+});
+
+heading.addEventListener("click", () => {
+    if (suppressNextClick) {
+        suppressNextClick = false;
+        return;
+    }
+
+    stopErasing({
+        pointerId: activePointerId
     });
+
+    renderName();
+});
 
     renderName();
 }
