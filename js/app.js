@@ -512,6 +512,7 @@ function initializeTheme() {
 
 
 
+
 function initializeThanosEffect() {
     const img = document.getElementById("thanosImage");
     const wrapper = document.querySelector(".image-wrapper");
@@ -524,24 +525,24 @@ function initializeThanosEffect() {
 
     const DURATION = 12000;
     const PARTICLE_LIFETIME = 6500;
-
-    // One particle per 5x5 source-pixel area.
     const PARTICLE_STEP = 5;
 
-    // Particle movement.
     const UPWARD_MIN = 75;
     const UPWARD_MAX = 220;
 
     const RIGHT_MIN = 15;
     const RIGHT_MAX = 155;
 
-    // Space for particles above and to the right.
     const TOP_SPACE = 300;
     const RIGHT_SPACE = 500;
+    const BOTTOM_SPACE = 60;
 
     const RELEASE_VARIATION = 0.12;
 
-    // ==================================================
+    // Must match the CSS bottom fade.
+    const BOTTOM_FADE_START = 0.90;
+
+    // =================================================
 
     const canvas = document.createElement("canvas");
     canvas.id = "thanosCanvas";
@@ -550,7 +551,8 @@ function initializeThanosEffect() {
         position: "absolute",
         pointerEvents: "none",
         display: "none",
-        zIndex: "5"
+        zIndex: "5",
+        maxWidth: "none"
     });
 
     wrapper.appendChild(canvas);
@@ -567,25 +569,22 @@ function initializeThanosEffect() {
         return;
     }
 
-    // Preserve original mask styles.
+    // Preserve original image masks.
     const originalMask = img.style.maskImage;
     const originalWebkitMask = img.style.webkitMaskImage;
     const originalMaskComposite = img.style.maskComposite;
-    const originalWebkitMaskComposite =
-        img.style.webkitMaskComposite;
+    const originalWebkitMaskComposite = img.style.webkitMaskComposite;
+    const originalMaskSize = img.style.maskSize;
+    const originalWebkitMaskSize = img.style.webkitMaskSize;
+    const originalMaskRepeat = img.style.maskRepeat;
+    const originalWebkitMaskRepeat = img.style.webkitMaskRepeat;
 
     const computed = getComputedStyle(img);
 
     const baseMask = computed.maskImage;
     const baseWebkitMask = computed.webkitMaskImage;
-
-    const baseMaskComposite = computed.maskComposite;
-    const baseWebkitMaskComposite =
-        computed.webkitMaskComposite;
-
     const baseMaskSize = computed.maskSize;
     const baseWebkitMaskSize = computed.webkitMaskSize;
-
     const baseMaskRepeat = computed.maskRepeat;
     const baseWebkitMaskRepeat = computed.webkitMaskRepeat;
 
@@ -600,13 +599,61 @@ function initializeThanosEffect() {
 
     let imageWidth = 0;
     let imageHeight = 0;
-
     let imageCssWidth = 0;
     let imageCssHeight = 0;
-
     let dpr = 1;
 
     const uniforms = {};
+
+    // ================= MASKED SOURCE IMAGE =================
+
+    function createMaskedSourceCanvas() {
+        const sourceCanvas = document.createElement("canvas");
+
+        sourceCanvas.width = img.naturalWidth;
+        sourceCanvas.height = img.naturalHeight;
+
+        const ctx = sourceCanvas.getContext("2d");
+
+        ctx.clearRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+        ctx.drawImage(img, 0, 0);
+
+        // Horizontal fade.
+        ctx.globalCompositeOperation = "destination-in";
+
+        const horizontalGradient = ctx.createLinearGradient(
+            0, 0,
+            sourceCanvas.width, 0
+        );
+
+        horizontalGradient.addColorStop(0, "rgba(0,0,0,0)");
+        horizontalGradient.addColorStop(0.35, "rgba(0,0,0,1)");
+        horizontalGradient.addColorStop(0.65, "rgba(0,0,0,1)");
+        horizontalGradient.addColorStop(1, "rgba(0,0,0,0)");
+
+        ctx.fillStyle = horizontalGradient;
+        ctx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+
+        // Bottom fade.
+        const verticalGradient = ctx.createLinearGradient(
+            0, 0,
+            0, sourceCanvas.height
+        );
+
+        verticalGradient.addColorStop(0, "rgba(0,0,0,1)");
+        verticalGradient.addColorStop(
+            BOTTOM_FADE_START,
+            "rgba(0,0,0,1)"
+        );
+        verticalGradient.addColorStop(1, "rgba(0,0,0,0)");
+
+        ctx.fillStyle = verticalGradient;
+        ctx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+
+        ctx.globalCompositeOperation = "source-over";
+
+        return sourceCanvas;
+    }
 
     // ================= VERTEX SHADER =================
 
@@ -656,7 +703,7 @@ function initializeThanosEffect() {
             float random3 = randomValue(pixelPosition + 43.17);
             float random4 = randomValue(pixelPosition + 91.73);
 
-            // Top-right to bottom-left release sequence.
+            // Release from top-right towards bottom-left.
             float releaseProgress =
                 0.5 * (1.0 - a_uv.x) +
                 0.5 * a_uv.y;
@@ -682,11 +729,10 @@ function initializeThanosEffect() {
                 return;
             }
 
-            // Original source location.
+            // Original position.
             float originalX = a_uv.x * u_imageWidth;
             float originalY = a_uv.y * u_imageHeight;
 
-            // Individual upward and rightward speeds.
             float upwardSpeed = mix(
                 u_upwardMin,
                 u_upwardMax,
@@ -713,7 +759,7 @@ function initializeThanosEffect() {
                 rightSpeed * age +
                 0.5 * horizontalAcceleration * age * age;
 
-            // Independent airflow.
+            // Airflow turbulence.
             float phase = random1 * 6.28318530718;
 
             float turbulenceX =
@@ -774,7 +820,6 @@ function initializeThanosEffect() {
         out vec4 outColor;
 
         void main() {
-            // Circular particle with soft edges.
             vec2 point = gl_PointCoord - vec2(0.5);
 
             float distanceFromCenter = length(point);
@@ -784,13 +829,11 @@ function initializeThanosEffect() {
 
             if (circleAlpha <= 0.01) discard;
 
-            // Read original pixel colour.
             vec4 color = texture(
                 u_image,
                 vec2(v_uv.x, 1.0 - v_uv.y)
             );
 
-            // Ignore transparent pixels.
             if (color.a < 0.01) discard;
 
             outColor = vec4(
@@ -834,7 +877,6 @@ function initializeThanosEffect() {
 
         gl.attachShader(result, vertexShader);
         gl.attachShader(result, fragmentShader);
-
         gl.linkProgram(result);
 
         if (!gl.getProgramParameter(result, gl.LINK_STATUS)) {
@@ -885,13 +927,15 @@ function initializeThanosEffect() {
             gl.CLAMP_TO_EDGE
         );
 
+        const maskedCanvas = createMaskedSourceCanvas();
+
         gl.texImage2D(
             gl.TEXTURE_2D,
             0,
             gl.RGBA,
             gl.RGBA,
             gl.UNSIGNED_BYTE,
-            img
+            maskedCanvas
         );
     }
 
@@ -901,9 +945,7 @@ function initializeThanosEffect() {
         const columns = Math.ceil(imageWidth / PARTICLE_STEP);
         const rows = Math.ceil(imageHeight / PARTICLE_STEP);
 
-        const vertices = new Float32Array(
-            columns * rows * 2
-        );
+        const vertices = new Float32Array(columns * rows * 2);
 
         let index = 0;
 
@@ -962,15 +1004,19 @@ function initializeThanosEffect() {
         imageWidth = img.naturalWidth;
         imageHeight = img.naturalHeight;
 
-        if (!imageWidth || !imageHeight || !rect.width) return;
+        if (!imageWidth || !imageHeight || !rect.width || !rect.height) {
+            return;
+        }
 
         imageCssWidth = rect.width;
         imageCssHeight = rect.height;
 
         dpr = Math.min(window.devicePixelRatio || 1, 2);
 
+        // Extra room on right, top and bottom.
         const canvasCssWidth = rect.width + RIGHT_SPACE;
-        const canvasCssHeight = rect.height + TOP_SPACE;
+        const canvasCssHeight =
+            rect.height + TOP_SPACE + BOTTOM_SPACE;
 
         canvas.width = Math.ceil(canvasCssWidth * dpr);
         canvas.height = Math.ceil(canvasCssHeight * dpr);
@@ -1098,16 +1144,22 @@ function initializeThanosEffect() {
         img.style.webkitMaskImage = originalWebkitMask;
 
         img.style.maskComposite = originalMaskComposite;
-        img.style.webkitMaskComposite =
-            originalWebkitMaskComposite;
+        img.style.webkitMaskComposite = originalWebkitMaskComposite;
+
+        img.style.maskSize = originalMaskSize;
+        img.style.webkitMaskSize = originalWebkitMaskSize;
+
+        img.style.maskRepeat = originalMaskRepeat;
+        img.style.webkitMaskRepeat = originalWebkitMaskRepeat;
     }
 
     function applyDissolveMask(progress) {
-        const start = Math.max(0, progress - 0.045);
-        const end = Math.min(1, progress + 0.045);
+        const start = Math.max(0, progress - 0.08);
+const end = Math.min(1, progress + 0.08);
 
         const svg = `
             <svg xmlns="http://www.w3.org/2000/svg"
+                 preserveAspectRatio="none"
                  viewBox="0 0 1000 1000">
 
                 <linearGradient
@@ -1146,10 +1198,10 @@ function initializeThanosEffect() {
             `${animatedMask}, ${baseWebkitMask}`;
 
         img.style.maskComposite =
-            baseMaskComposite || "intersect";
+            "intersect, intersect";
 
         img.style.webkitMaskComposite =
-            baseWebkitMaskComposite || "source-in";
+            "source-in, source-in";
 
         img.style.maskSize =
             `100% 100%, ${baseMaskSize}`;
@@ -1279,6 +1331,7 @@ function initializeThanosEffect() {
         }
     });
 }
+
 
 document.addEventListener(
     "DOMContentLoaded",

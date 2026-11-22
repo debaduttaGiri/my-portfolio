@@ -2517,3 +2517,80 @@ section[id] {
         white-space: nowrap;
     }
 }
+
+/* Prevent the particle canvas from creating a horizontal scrollbar */
+html,
+body {
+    overflow-x: clip !important;
+}
+
+/* Allow particles to extend beyond the portrait */
+.hero,
+.hero-image,
+.image-wrapper {
+    overflow: visible !important;
+}
+
+/* Portrait horizontal fade + subtle bottom fade */
+.image-wrapper img {
+    -webkit-mask-image:
+        linear-gradient(
+            to right,
+            transparent 0%,
+            black 35%,
+            black 65%,
+            transparent 100%
+        ),
+        linear-gradient(
+            to bottom,
+            black 0%,
+            black 90%,
+            transparent 100%
+        );
+
+    -webkit-mask-composite: source-in;
+
+    mask-image:
+        linear-gradient(
+            to right,
+            transparent 0%,
+            black 35%,
+            black 65%,
+            transparent 100%
+        ),
+        linear-gradient(
+            to bottom,
+            black 0%,
+            black 98%,
+            transparent 100%
+        );
+
+    mask-composite: intersect;
+}
+
+/* Particle canvas */
+#thanosCanvas {
+    position: absolute !important;
+    pointer-events: none !important;
+    z-index: 5 !important;
+    max-width: none !important;
+}
+.hero-image {
+    height: auto !important;
+    min-height: 0 !important;
+    align-items: flex-start;
+}
+
+.image-wrapper {
+    height: auto !important;
+    min-height: 0 !important;
+}
+
+.image-wrapper img {
+    display: block;
+    width: 100%;
+    height: auto !important;
+    max-height: none !important;
+    object-fit: contain;
+    object-position: center top;
+}
