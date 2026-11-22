@@ -2350,10 +2350,13 @@ section[id] {
     width: 540px;
     height: 650px;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
 }
 
 #thanosImage {
     transition: opacity 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
 }
 
 #thanosCanvas {

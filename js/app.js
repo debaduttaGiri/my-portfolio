@@ -1317,6 +1317,7 @@ const end = Math.min(1, progress + 0.08);
     }
 
     img.addEventListener("click", startDisintegration);
+    img.addEventListener("contextmenu", event => event.preventDefault());
     img.style.cursor = "pointer";
 
     if (img.complete && img.naturalWidth) {
